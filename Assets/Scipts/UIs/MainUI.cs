@@ -31,7 +31,7 @@ public class MainUI : MonoBehaviour
     private float startTime;
     private int currentTabIndex = 1;
 
-    private PlayerData player { get => PlayerData.Instance; }
+    private Player player { get => Player.Instance; }
 
     private void Awake()
     {
