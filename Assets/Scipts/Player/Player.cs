@@ -39,7 +39,7 @@ public class Player : MonoBehaviour
 
     public void WateringTree(Tree tree)
     {
-        if (tree.IsWatered || !RemoveWaterDrop(1))
+        if (tree.IsGrowing || !RemoveWaterDrop(1))
             return;
 
         tree.Grow();
