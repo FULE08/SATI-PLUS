@@ -47,10 +47,7 @@ public class Tree : MonoBehaviour
         {
             wateringButton.onClick.AddListener(() => 
             {
-                if(!isGrowing && currentState != TreeState.Withered)
-                {
-                    Player.Instance.WateringTree(this);
-                }
+                Player.Instance.WateringTree(this);
             });
         }
     }
