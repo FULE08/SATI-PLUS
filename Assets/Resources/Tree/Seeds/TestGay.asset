@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72460ac4e4bfe4e609ee3c31bfcea331, type: 3}
   m_Name: TestGay
   m_EditorClassIdentifier: Assembly-CSharp::SeedSO
-  seedName: 
+  seedName: TreeGay
   seedSprite: {fileID: 0}
-  growthTime: 0
-  waterRequirement: 0
+  growthDuration: 5
+  rarity: 0

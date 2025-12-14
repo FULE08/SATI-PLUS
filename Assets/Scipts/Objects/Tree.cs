@@ -1,26 +1,27 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System; // จำเป็นสำหรับการใช้ DateTime
+using System;
+using System.Collections.Generic;
+using System.Linq; // จำเป็นสำหรับการใช้ DateTime
 
 public class Tree : MonoBehaviour
 {
     public enum TreeState
-{
-    Sapling,    // ต้นอ่อน
-    Mature,     // โตเต็มวัย (ออกผลได้)
-    Withered    // เหี่ยวเฉา
-}
+    {
+        Sapling,    // ต้นอ่อน
+        Mature,     // โตเต็มวัย (ออกผลได้)
+        Withered    // เหี่ยวเฉา
+    }
 
     [Header("Settings")]
     [SerializeField] private string treeID = "Tree_01"; // *สำคัญ* ชื่อ ID สำหรับเซฟข้อมูล (ถ้ามีหลายต้นต้องตั้งไม่ซ้ำกัน)
     [SerializeField] private SeedSO seed;
-    [SerializeField] private float growthDuration = 10f; // เวลาเติบโต (วินาที)
     [SerializeField, Range(0, 100)] private float dropChance = 50f;
 
     [Header("Status")]
     [SerializeField] private TreeState currentState = TreeState.Sapling;
-    [SerializeField] private int growthStage = 0;
+    private int growthStage = 0;
     [SerializeField] private bool isGrowing = false; 
 
     // Public Properties
@@ -33,6 +34,8 @@ public class Tree : MonoBehaviour
     // Internal Variables
     private DateTime finishTime; // เวลาที่จะโตเสร็จ (เวลาจริง)
     private bool isTimerRunning = false; // ตัวคุม Update ไม่ให้ทำงานฟรีๆ
+    private List<SeedSO> allSeeds = new();
+    private GameObject seedPrefab;
 
     private void Start()
     {
@@ -50,6 +53,11 @@ public class Tree : MonoBehaviour
                 Player.Instance.WateringTree(this);
             });
         }
+
+        allSeeds = Resources.LoadAll<SeedSO>("Tree/Seeds").ToList();
+        seedPrefab = Resources.Load<GameObject>("UIs/SeedPrefab");
+
+        TryDropSeed();
     }
 
     private void Update()
@@ -79,7 +87,7 @@ public class Tree : MonoBehaviour
         
         // --- เริ่มบันทึกเวลา ---
         // กำหนดเวลาเสร็จ = เวลาปัจจุบัน + ระยะเวลาที่ต้องรอ
-        finishTime = DateTime.Now.AddSeconds(growthDuration);
+        finishTime = DateTime.Now.AddSeconds(seed.GrowthDuration);
         
         // เซฟลงเครื่องทันที กันเกมหลุด
         SaveTargetTime();
@@ -162,11 +170,93 @@ public class Tree : MonoBehaviour
 
     private void TryDropSeed()
     {
-        float randomValue = UnityEngine.Random.Range(0f, 100f);
-        if (randomValue <= dropChance)
+        int rounds = 3;
+
+        Debug.Log($"<color=cyan>--- Harvesting Start ({seed.Rarity} Tree) ---</color>");
+
+        for (int i = 0; i < rounds; i++)
         {
-            Debug.Log($"Offline/Online Reward: Got Seed from {seed.name}");
+            // 2.1 สุ่มจำนวนที่จะได้ในรอบนี้ (1 ถึง 3 ชิ้น)
+            // Random.Range(int min, int max) ตัวหลังจะไม่ถูกรวม ดังนั้นต้องใส่ 4 เพื่อให้ได้ถึง 3
+            int quantity = UnityEngine.Random.Range(1, 4); 
+
+            // 2.2 สุ่ม "ชนิด" ของเมล็ด (ใช้ระบบถ่วงน้ำหนักตามเดิม)
+            SeedSO reward = GetWeightedRandomSeed();
+
+            if (reward != null)
+            {
+                Debug.Log($"Round {i + 1}: Got {quantity} x {reward.SeedName} [{reward.Rarity}]");
+
+                Canvas canvas = FindObjectsByType<Canvas>(FindObjectsSortMode.None).FirstOrDefault();
+                
+                for (int j = 0; j < quantity; j++)
+                {
+                    GameObject seed = Instantiate(seedPrefab, canvas.transform);
+                    seed.GetComponent<Seed>().Init(reward);
+                }
+            }
         }
+        
+        Debug.Log("<color=cyan>--- Harvesting End ---</color>");
+    }
+
+    private SeedSO GetWeightedRandomSeed()
+    {
+        int totalWeight = 0;
+        List<int> weights = new List<int>();
+
+        // แปลง Rarity ของต้นไม้เรา เป็นตัวเลข (0=Common ... 4=Legendary)
+        int myTier = (int)seed.Rarity; 
+
+        foreach (var candidateSeed in allSeeds)
+        {
+            // แปลง Rarity ของเมล็ดเป้าหมาย เป็นตัวเลข
+            int targetTier = (int)candidateSeed.Rarity;
+            
+            // --- สูตรคำนวณครอบคลุม 5 ระดับ ---
+
+            // 1. Base Weight (คะแนนพื้นฐาน): 80 คะแนน
+            int weight = 80;
+
+            // 2. Distance Penalty (ยิ่งห่างชั้น ยิ่งโอกาสน้อย):
+            // ห่าง 1 ขั้น ลบ 20 คะแนน (เช่น ต้น Common(0) จะดรอป Rare(2) -> ห่าง 2 -> โดนลบ 40)
+            int diff = Mathf.Abs(myTier - targetTier);
+            weight -= (diff * 20);
+
+            // 3. High Tier Bonus (ยิ่งต้นไม้เทพ ยิ่งบวกคะแนนเพิ่ม):
+            // สูตร: เอา level ต้นไม้ * 15 คะแนน
+            // Common(0) = +0
+            // Uncommon(1) = +15
+            // ...
+            // Legendary(4) = +60 !! (ทำให้โอกาสได้ของดีพุ่งกระฉูด)
+            
+            // เงื่อนไข: จะได้โบนัสนี้เฉพาะเมื่อ เมล็ดเป้าหมาย level สูงพอๆ กับต้นไม้เรา (กันไม่ให้ต้นเทพไปดรอปของกากเยอะเกิน)
+            if (targetTier >= myTier - 1) 
+            {
+                weight += (myTier * 15);
+            }
+
+            // 4. กันค่าติดลบ (ต่ำสุดให้ 1 คือยังมีโอกาสออก 1% ดีกว่าไม่ออกเลย)
+            if (weight <= 0) weight = 1;
+
+            weights.Add(weight);
+            totalWeight += weight;
+        }
+
+        // --- สุ่มตามน้ำหนัก (เหมือนเดิม) ---
+        int randomValue = UnityEngine.Random.Range(0, totalWeight);
+        int currentSum = 0;
+
+        for (int i = 0; i < allSeeds.Count; i++)
+        {
+            currentSum += weights[i];
+            if (randomValue < currentSum)
+            {
+                return allSeeds[i];
+            }
+        }
+
+        return null;
     }
 
     private void UpdateTimerUI(TimeSpan remainingTime)
