@@ -27,7 +27,10 @@ public class GameManager : MonoBehaviour
         resultPanel.SetActive(false);
 
         // 2. สุ่มเกม
-        PlayRandomGame();
+        BreathingController.Instance.StartBreathingSession(30f, () => 
+        {
+            PlayRandomGame();
+        });
     }
 
     private void PlayRandomGame()
