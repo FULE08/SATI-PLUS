@@ -74,6 +74,9 @@ public class GameManager : MonoBehaviour
     private void ShowResult(int score, int reward)
     {
         resultPanel.SetActive(true);
-        resultText.text = $"Game Over!\nScore: {score}\nReward: {reward} Coins";
+        resultText.text = $"Game Over!\nScore: {score}";
+        resultText.text += $"\nYou earned {reward} Water Drops!";
+
+        Player.Instance.AddWaterDrop(reward);
     }
 }
