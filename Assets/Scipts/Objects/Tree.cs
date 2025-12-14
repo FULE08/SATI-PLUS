@@ -56,8 +56,6 @@ public class Tree : MonoBehaviour
 
         allSeeds = Resources.LoadAll<SeedSO>("Tree/Seeds").ToList();
         seedPrefab = Resources.Load<GameObject>("UIs/SeedPrefab");
-
-        TryDropSeed();
     }
 
     private void Update()
